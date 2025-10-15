@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#000000">
+  <title>Nomes</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="stylesheet" href="./style.css">
+  <!-- iOS PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Nomes">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+</head>
+<body>
+  <header class="appbar">
+    <h1>Nomes</h1>
+    <div class="appbar-actions">
+      <button id="btnImportar" class="ghost">Importar</button>
+      <button id="btnLimpar" class="ghost">Limpar</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Entrada turbo -->
+    <section class="card">
+      <label for="entradaTurbo" class="label">Entrada rápida</label>
+      <input id="entradaTurbo" class="input" placeholder="Ex.: 8 IJT" autocomplete="off" />
+      <small class="hint">Formato: <strong>[tamanho] [L1’][L2’][Lf’]</strong> — ex.: <code>8 IJT</code> ou <code>7 ACR</code></small>
+      <div class="or">ou</div>
+      <!-- Entradas separadas -->
+      <div class="grid">
+        <div>
+          <label class="label" for="tamanho">Tamanho</label>
+          <input id="tamanho" type="number" min="2" class="input" placeholder="8">
+        </div>
+        <div>
+          <label class="label" for="l1">L1’</label>
+          <input id="l1" maxlength="1" class="input center" placeholder="I" autocomplete="off">
+        </div>
+        <div>
+          <label class="label" for="l2">L2’</label>
+          <input id="l2" maxlength="1" class="input center" placeholder="J" autocomplete="off">
+        </div>
+        <div>
+          <label class="label" for="lf">Lf’</label>
+          <input id="lf" maxlength="1" class="input center" placeholder="T" autocomplete="off">
+        </div>
+      </div>
+      <button id="btnSugerir" class="primary">Sugerir nome</button>
+      <small class="hint">Dica: <em>cole sua lista</em> em <code>data/nomes.txt</code> (um por linha) para carregar automático.</small>
+    </section>
+
+    <!-- Resultado -->
+    <section id="resultado" class="card" hidden>
+      <h2 class="title">Sugestão</h2>
+      <div id="top1" class="top1">—</div>
+      <div id="conf" class="conf">Confiança: —</div>
+      <details class="detalhes">
+        <summary>Top 5 candidatos</summary>
+        <ol id="lista"></ol>
+      </details>
+    </section>
+
+    <!-- Importador -->
+    <section id="importador" class="card" hidden>
+      <h2 class="title">Importar lista</h2>
+      <textarea id="textareaLista" class="textarea" rows="10" placeholder="Um nome por linha (acentos são ok)"></textarea>
+      <div class="row">
+        <button id="btnSalvarLista" class="primary">Salvar</button>
+        <button id="btnFecharImportador" class="ghost">Fechar</button>
+      </div>
+      <small class="hint">A lista fica salva offline. Recomendo também publicar em <code>data/nomes.txt</code> para carregamento rápido.</small>
+    </section>
+  </main>
+
+  <script src="./script.js"></script>
+</body>
+</html>
