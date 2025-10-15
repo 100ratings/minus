@@ -1,0 +1,40 @@
+:root{
+  --bg:#000; --fg:#fff; --muted:#9aa0a6; --card:#111; --accent:#ff9500; --primary:#3cd14b;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--fg); font:16px -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+}
+.appbar{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:14px 16px; position:sticky; top:0; background:rgba(0,0,0,.85); backdrop-filter:saturate(180%) blur(10px);
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.appbar h1{font-size:18px;font-weight:600}
+.appbar .ghost{margin-left:8px}
+.container{max-width:780px;margin:0 auto;padding:16px;display:grid;gap:16px}
+.card{background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px;display:grid;gap:12px}
+.label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+.input, .textarea{
+  width:100%; background:#0d0d0d; color:var(--fg); border:1px solid rgba(255,255,255,.12);
+  border-radius:10px; padding:12px 14px; outline:none;
+}
+.input.center{text-align:center;text-transform:uppercase;letter-spacing:.1em}
+.input::placeholder,.textarea::placeholder{color:#666}
+.primary, .ghost{
+  border-radius:999px; padding:10px 16px; border:1px solid transparent; cursor:pointer; font-weight:600
+}
+.primary{background:rgba(60,209,75,.18); color:var(--primary); border-color:rgba(60,209,75,.3)}
+.primary:active{transform:translateY(1px)}
+.ghost{background:transparent;color:#ddd;border-color:rgba(255,255,255,.18)}
+.hint{color:var(--muted);font-size:12px}
+.or{color:#777;text-align:center;font-size:12px}
+.grid{display:grid;grid-template-columns:1fr repeat(3,90px);gap:10px}
+.title{font-size:14px;color:#ddd}
+.top1{font-size:28px;font-weight:700;letter-spacing:.02em}
+.conf{color:#c0ffc8;font-size:13px}
+.detalhes summary{cursor:pointer;color:#ddd}
+#lista{margin:8px 0 0 20px}
+.row{display:flex;gap:8px}
