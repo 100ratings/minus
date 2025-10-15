@@ -1,12 +1,12 @@
 // =====================
-// Nomes — script.js
-// Lógica: até 10 passos
-// 1ª e 2ª letras: pista à FRENTE (real -> pista) entre +1..+10
-// Última letra:   pista ATRÁS   (real -> pista) entre -1..-10
+// Nomes — script.js (versão: forward + wrap até 10)
+// Regra: para 1ª, 2ª e última letras, a pista está à FRENTE da letra real,
+//        entre +1 e +10 passos, com wrap Z→A.
+// Ex.: A→I = +8 (ok), Z→B = +2 (ok), O→I = +20 (não passa porque >10).
 // =====================
 
 // Config
-const MAX_STEPS = 10;                  // altere se quiser permitir mais/menos passos
+const MAX_STEPS = 10;                          // limite de passos pra frente (1..10)
 const weights   = { first:0.4, second:0.2, last:0.4 }; // pesos da distância ponderada
 
 // Alfabeto e normalização
@@ -24,8 +24,13 @@ const normalize = (s) => (s||'')
   .replace(/[^A-Z]/g, '');
 
 const code = (ch) => AZ.indexOf(ch);
-const stepsForward  = (real, pista) => code(pista) - code(real); // pode ser negativo
-const stepsBackward = (real, pista) => code(real) - code(pista); // idem
+
+// passos pra FRENTE com wrap (0..25)
+function forwardWrapSteps(real, pista){
+  const r = code(real), p = code(pista);
+  if (r < 0 || p < 0) return Infinity; // segurança
+  return (p - r + 26) % 26;            // 0..25 (0 = mesma letra)
+}
 
 // Estado
 let nomes = [];   // [{ raw, norm, len, first, second, last }]
@@ -103,11 +108,11 @@ function sugerir({len,L1,L2,Lf}){
   // 1) Filtra por tamanho
   const pool = nomes.filter(n => n.len === len);
 
-  // 2) Regras: 1ª e 2ª à frente (1..MAX); última atrás (1..MAX)
+  // 2) Regras: TODAS pra frente com wrap: passos ∈ [1..MAX_STEPS]
   const pool2 = pool.filter(n => {
-    const d1 = stepsForward(n.first,  L1); // real->pista
-    const d2 = stepsForward(n.second, L2);
-    const d3 = stepsBackward(n.last,  Lf);
+    const d1 = forwardWrapSteps(n.first,  L1); // real->pista
+    const d2 = forwardWrapSteps(n.second, L2);
+    const d3 = forwardWrapSteps(n.last,   Lf);
     return (d1 >= 1 && d1 <= MAX_STEPS) &&
            (d2 >= 1 && d2 <= MAX_STEPS) &&
            (d3 >= 1 && d3 <= MAX_STEPS);
@@ -117,9 +122,9 @@ function sugerir({len,L1,L2,Lf}){
 
   // 3) Distância ponderada (quanto menor, melhor)
   const scored = pool2.map(n => {
-    const d1 = stepsForward(n.first,  L1);
-    const d2 = stepsForward(n.second, L2);
-    const d3 = stepsBackward(n.last,  Lf);
+    const d1 = forwardWrapSteps(n.first,  L1);
+    const d2 = forwardWrapSteps(n.second, L2);
+    const d3 = forwardWrapSteps(n.last,   Lf);
     const wdist = d1*weights.first + d2*weights.second + d3*weights.last;
     return { ...n, d1, d2, d3, wdist };
   });
@@ -130,8 +135,7 @@ function sugerir({len,L1,L2,Lf}){
 }
 
 function confFromWdist(w){
-  // 0 passos -> 100% (na prática nunca é 0 porque mínimo é 1+1+1 ponderado)
-  // ~10 passos ponderados -> ~0%
+  // Mapeamento simples de confiança (ajuste livre)
   const c = Math.max(0, 100 - (w*10));
   return Math.round(c);
 }
@@ -159,12 +163,12 @@ function renderResultado(cands, {L1,L2,Lf}){
   lista.innerHTML = '';
   const top5 = cands.slice(0,5);
   for (const n of top5){
-    // Exibe as relações na forma: real -> pista (passos)
     const li = document.createElement('li');
-    li.textContent = `${n.raw} — dist ${n.wdist.toFixed(2)} `
-      + `(1ª: ${n.first}→${L1} +${stepsForward(n.first,L1)}, `
-      + `2ª: ${n.second}→${L2} +${stepsForward(n.second,L2)}, `
-      + `últ: ${n.last}→${Lf} -${stepsBackward(n.last,Lf)})`;
+    li.textContent =
+      `${n.raw} — dist ${n.wdist.toFixed(2)} ` +
+      `(1ª: ${n.first}→${L1} +${forwardWrapSteps(n.first,L1)}, ` +
+      `2ª: ${n.second}→${L2} +${forwardWrapSteps(n.second,L2)}, ` +
+      `últ: ${n.last}→${Lf} +${forwardWrapSteps(n.last,Lf)})`;
     lista.appendChild(li);
   }
 }
@@ -196,7 +200,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnLimpar = document.querySelector('#btnLimpar');
 
   btnSug.addEventListener('click', () => {
-    if (!ready){ alert('Impor­te ou adicione a lista de nomes primeiro.'); return; }
+    if (!ready){ alert('Importe ou adicione a lista de nomes primeiro.'); return; }
     const params = getParams();
     if (!params){ alert('Preencha: tamanho e as 3 letras (L1’, L2’, Lf’).'); return; }
     const cands = sugerir(params);
