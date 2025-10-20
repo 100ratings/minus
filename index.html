@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Minus</title>
+
+<!-- ✅ Adições para PWA/iOS fullscreen -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0a0c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Minus">
+<link rel="apple-touch-icon" href="icons/icon-512.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+<!-- ✅ fim das adições -->
+
+<style>
+  :root{ --panel:#14141d; --muted:#9aa3ad; --ink:#fff; --radius:14px;}
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:#0a0a0c; color:#e8eef3;
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial;
+    display:flex; flex-direction:column;
+    overflow-y:auto;
+  }
+
+  /* Barra superior com top nomes */
+  header{
+    padding: calc(10px + env(safe-area-inset-top)) 16px 8px;
+    padding-top: calc(10px + constant(safe-area-inset-top)); /* fallback iOS antigo */
+    display:flex; flex-wrap:wrap;
+    gap:8px; align-items:center; justify-content:space-between;
+  }
+  #topNames{
+    font-weight:600;
+    font-size:15px;
+    color:#bcd6ff;
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  #topNames span{white-space:nowrap;}
+
+  button{
+    appearance:none; border:1px solid #2a2d39; background:#1a1111; color:#ffc3c3;
+    padding:8px 12px; border-radius:10px; cursor:pointer; font-weight:600; font-size:14px;
+  }
+
+  /* Canvas central (~2/3 da tela) ligeiramente mais estreito */
+  .middle{
+    flex:1; display:flex; align-items:center; justify-content:center;
+    padding:10px 16px;
+  }
+  .stage-wrap{
+    width:92%;  /* antes 100% → agora 92% pra sobrar borda de rolagem */
+    height:63vh; min-height:440px; max-width:1100px;
+    border-radius:var(--radius); overflow:hidden; background:#000;
+    box-shadow:0 0 0 1px #1f2330 inset, 0 12px 32px rgba(0,0,0,.45);
+    position:relative; touch-action:none;
+  }
+  canvas{display:block; width:100%; height:100%; background:#000; touch-action:none;}
+
+  /* HUD */
+  .hud{position:absolute; inset:0; display:grid; place-items:center; pointer-events:none}
+  .hud .predChar{ font-size:min(22vw, 160px); color:rgba(255,255,255,.92); text-shadow:0 0 18px rgba(255,255,255,.18); line-height:1; }
+  .hud .predInfo{ margin-top:8px; font-size:14px; color:#b8c3ce; text-shadow:0 1px 0 rgba(0,0,0,.5) }
+
+  main{padding:0 16px 10px; display:flex; flex-direction:column; gap:10px}
+  .row{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+  .badge{padding:6px 10px; border-radius:999px; background:#101421; border:1px solid #243047; color:#bcd6ff; font-weight:700}
+  .badge.ok{background:#0f1a12; border-color:#214b2b; color:#c8ffd1}
+  .badge.warn{background:#1a1111; border-color:#3f2323; color:#ffc3c3}
+  .muted{color:#8a95a3}
+
+  /* Resultados */
+  .results{display:grid; gap:8px}
+  .result{ background:#0e111a; border:1px solid #23283b; border-radius:12px; padding:10px; }
+  .result__row{display:flex; justify-content:space-between; align-items:center; gap:8px}
+  .result__name{font-weight:800}
+  .result__pct{color:#bcd6ff; font-weight:700}
+  .result__bar{height:6px; background:#0b0f1a; border-radius:999px; overflow:hidden; margin-top:8px}
+  .result__fill{display:block; height:100%; background:linear-gradient(90deg,#57d3ff,#9aff7a)}
+  .footer{padding:8px 16px 16px; color:#7f8a96; font-size:12px; display:flex; justify-content:space-between; align-items:center}
+  .version{color:#596270; font-weight:600}
+</style>
+</head>
+<body>
+  <header>
+    <div id="topNames">Minus</div>
+    <button id="btnRestart">Reiniciar</button>
+  </header>
+
+  <div class="middle">
+    <div class="stage-wrap">
+      <canvas id="pad" width="1400" height="900"></canvas>
+      <div class="hud" id="hud" style="opacity:.0">
+        <div>
+          <div class="predChar" id="hudChar">?</div>
+          <div class="predInfo" id="hudInfo">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <main>
+    <div class="row">
+      <span id="stepBadge" class="badge">Preparando…</span>
+      <span id="hint" class="muted">Desenhe: M/F → 1–9 → 3 letras</span>
+      <span id="status" class="badge" style="margin-left:auto">Carregando…</span>
+    </div>
+
+<script>
+/* === configuração básica (mesma da v0.8.0) === */
+const AUTO_CLEAR_DELAY=250,LINE_WIDTH=18,W=7,N_RESAMPLE=64,SQUARE_SIZE=300,ANGLE_RANGE=Math.PI/4,ANGLE_STEP=Math.PI/90;
+const canvas=document.getElementById('pad'),ctx=canvas.getContext('2d',{willReadFrequently:true});
+ctx.lineCap='round';ctx.lineJoin='round';
+function paintBg(){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#000';ctx.fillRect(0,0,canvas.width,canvas.height);}paintBg();
+let drawing=false,lastX=0,lastY=0,strokePts=[];
+const hud=document.getElementById('hud'),hudChar=document.getElementById('hudChar'),hudInfo=document.getElementById('hudInfo');
+function getPos(e){const r=canvas.getBoundingClientRect();const x=(e.touches?e.touches[0].clientX:e.clientX)-r.left;const y=(e.touches?e.touches[0].clientY:e.clientY)-r.top;const sx=canvas.width/r.width,sy=canvas.height/r.height;return{x:x*sx,y:y*sy};}
+function startDraw(e){e.preventDefault();drawing=true;strokePts=[];const p=getPos(e);lastX=p.x;lastY=p.y;strokePts.push([p.x,p.y]);hud.style.opacity=.0;}
+function moveDraw(e){if(!drawing)return;e.preventDefault();const p=getPos(e);ctx.strokeStyle='#fff';ctx.lineWidth=LINE_WIDTH;ctx.beginPath();ctx.moveTo(lastX,lastY);ctx.lineTo(p.x,p.y);ctx.stroke();lastX=p.x;lastY=p.y;strokePts.push([p.x,p.y]);}
+function endDraw(){if(!drawing)return;drawing=false;onStrokeFinished(strokePts.slice());}
+canvas.addEventListener('pointerdown',startDraw);canvas.addEventListener('pointermove',moveDraw);
+canvas.addEventListener('pointerup',endDraw);canvas.addEventListener('pointerleave',endDraw);
+canvas.addEventListener('touchstart',startDraw,{passive:false});
+canvas.addEventListener('touchmove',moveDraw,{passive:false});
+canvas.addEventListener('touchend',endDraw,{passive:false});
+function clearPad(){paintBg();hud.style.opacity=.0;}
+
+/* === interface === */
+const stepBadge=document.getElementById('stepBadge'),hint=document.getElementById('hint'),statusEl=document.getElementById('status'),resultEl=document.getElementById('result'),topNames=document.getElementById('topNames');
+function setStatus(t,m=null){statusEl.textContent=t;statusEl.classList.remove('ok','warn');if(m==='ok')statusEl.classList.add('ok');if(m==='warn')statusEl.classList.add('warn');}
+function showHUD(l,s){hudChar.textContent=l??'?';hudInfo.textContent=s??'—';hud.style.opacity=.98;setTimeout(()=>{hud.style.opacity=.0;},800);}
+
+/* === reconhecedor === */
+function pathLength(p){let d=0;for(let i=1;i<p.length;i++){d+=Math.hypot(p[i][0]-p[i-1][0],p[i][1]-p[i-1][1]);}return d;}
+function resample(p,n){const I=pathLength(p)/(n-1);let D=0,pts=[p[0]];for(let i=1;i<p.length;i++){const[x1,y1]=p[i-1],[x2,y2]=p[i];const d=Math.hypot(x2-x1,y2-y1);if((D+d)>=I){const t=(I-D)/d;const qx=x1+t*(x2-x1),qy=y1+t*(y2-y1);pts.push([qx,qy]);p.splice(i,0,[qx,qy]);D=0;}else D+=d;}while(pts.length<n)pts.push(p[p.length-1]);return pts;}
+function centroid(p){let x=0,y=0;for(const q of p){x+=q[0];y+=q[1];}return[x/p.length,y/p.length];}
+function indicativeAngle(p){const c=centroid(p);return Math.atan2(c[1]-p[0][1],c[0]-p[0][0]);}
+function rotateBy(p,a){const c=centroid(p),cos=Math.cos(a),sin=Math.sin(a);return p.map(([x,y])=>{const dx=x-c[0],dy=y-c[1];return[dx*cos-dy*sin+c[0],dx*sin+dy*cos+c[1]];});}
+function boundingBox(p){let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;for(const[x,y]of p){if(x<minX)minX=x;if(y<minY)minY=y;if(x>maxX)maxX=x;if(y>maxY)maxY=y;}return{minX,minY,maxX,maxY};}
+function scaleToSquare(p,s){const b=boundingBox(p);const w=Math.max(1,b.maxX-b.minX),h=Math.max(1,b.maxY-b.minY);return p.map(([x,y])=>[(x-b.minX)*(s/w),(y-b.minY)*(s/h)]);}
+function translateToOrigin(p){const c=centroid(p);return p.map(([x,y])=>[x-c[0],y-c[1]]);}
+function distanceAtAngle(p,t,a){const np=rotateBy(p,a);return pathDistance(np,t);}
+function pathDistance(a,b){let d=0;for(let i=0;i<a.length;i++)d+=Math.hypot(a[i][0]-b[i][0],a[i][1]-b[i][1]);return d/a.length;}
+function distanceAtBestAngle(p,t,a,b,s){let x1=a,x2=b,f1=distanceAtAngle(p,t,x1),f2=distanceAtAngle(p,t,x2);while(Math.abs(b-a)>s){const x=(a+b)/2,fx=distanceAtAngle(p,t,x);if(f1<f2){b=x2;x2=x;f2=fx;}else{a=x1;x1=x;f1=fx;}}return Math.min(f1,f2);}
+function preprocess(p){if(!p||p.length<2)return null;let q=resample(p,N_RESAMPLE);const ang=indicativeAngle(q);q=rotateBy(q,-ang);q=scaleToSquare(q,SQUARE_SIZE);q=translateToOrigin(q);return q;}
+function recognizeWithAllowed(p,templates,allowed){const q=preprocess(p);if(!q)return{label:null,score:0};let b=1e9,name=null;for(const t of templates){if(allowed&&!allowed.has(t.label))continue;const d=distanceAtBestAngle(q,t.points,-ANGLE_RANGE,ANGLE_RANGE,ANGLE_STEP);if(d<b){b=d;name=t.label;}}const maxDist=.5*Math.sqrt(2*SQUARE_SIZE*SQUARE_SIZE);const s=1-(b/maxDist);return{label:name,score:Math.max(0,Math.min(1,s))};}
+
+/* === nomes + lógica === */
+let templates=[];try{const s=localStorage.getItem('trace_templates_v1');if(s){const arr=JSON.parse(s);if(Array.isArray(arr)&&arr.length)templates=arr;}}catch{}
+(async()=>{for(const u of['templates-tracos.json','templates.json']){try{const r=await fetch(u);if(r.ok){const a=await r.json();if(Array.isArray(a)&&a.length){templates=a;localStorage.setItem('trace_templates_v1',JSON.stringify(a));setStatus('Templates carregados.','ok');return;}}}catch{}}setStatus('⚠️ Sem templates','warn');})();
+let names=[];(async()=>{for(const u of['nomes.json','Nomes.json']){try{const r=await fetch(u);if(r.ok){const d=await r.json();if(Array.isArray(d)){names=d;setStatus(`Nomes: ${names.length}`,'ok');return;}}}catch{}}setStatus('⚠️ nomes.json','warn');})();
+function normalizeStr(s){return(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
+const AL="abcdefghijklmnopqrstuvwxyz";function idxOf(c){return AL.indexOf(c);}
+function dRev(b,t){const ib=idxOf(b),it=idxOf(t);if(ib<0||it<0)return-1;return(ib-it+AL.length)%AL.length;}
+function computeProbabilities(c,W){const w=c.map(x=>{const v=(W-x.d1+1)*(W-x.d2+1)*(W-x.d3+1);return{...x,weight:Math.max(v,0)}});const tot=w.reduce((a,b)=>a+b.weight,0);return w.map(x=>({...x,prob:tot>0?(x.weight/tot)*100:0}));}
+function runNameLogic(g,l,a,b,c){const cand=[];for(const{n:N,g:G}of names){if(G!==g)continue;const nn=normalizeStr(N.replace(/[\s-]+/g,''));if(nn.length!==l||nn.length<3)continue;const[n1,n2,n3]=[nn[0],nn[1],nn[2]];const d1=dRev(a,n1),d2=dRev(b,n2),d3=dRev(c,n3);if(d1<=0||d2<=0||d3<=0||d1>W||d2>W||d3>W)continue;cand.push({rawName:N,d1,d2,d3});}if(!cand.length)return[];return computeProbabilities(cand,W).sort((a,b)=>b.prob-a.prob).slice(0,9);}
+
+/* === fluxo === */
+const FLOW={step:1,gender:null,length:null,letters:[]};
+function updateStepUI(){if(FLOW.step===1){stepBadge.textContent='Etapa 1/3 — Sexo (M/F)';hint.textContent='Desenhe M ou F';}else if(FLOW.step===2){stepBadge.textContent='Etapa 2/3 — Tamanho (1–9)';hint.textContent='Desenhe um dígito 1–9';}else if(FLOW.step===3){stepBadge.textContent=`Etapa 3/3 — Letras (${FLOW.letters.length}/3)`;hint.textContent='Desenhe 3 letras (A–Z)';}else{stepBadge.textContent='Pronto';hint.textContent='Resultados abaixo';}}
+function allowedSetForStep(){if(FLOW.step===1)return new Set(['M','F']);if(FLOW.step===2)return new Set(['1','2','3','4','5','6','7','8','9']);if(FLOW.step===3)return new Set('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''));return null;}
+function restartFlow(){FLOW.step=1;FLOW.gender=null;FLOW.length=null;FLOW.letters=[];updateStepUI();setStatus('Reiniciado.','ok');}
+document.getElementById('btnRestart').addEventListener('click',restartFlow);
+
+function onStrokeFinished(p){
+  if(!templates.length){setStatus('Sem templates','warn');setTimeout(clearPad,AUTO_CLEAR_DELAY);return;}
+  const allowed=allowedSetForStep();
+  const{label,score}=recognizeWithAllowed(p,templates,allowed);
+  const pct=Math.round(score*100);
+  if(!label){setStatus('Não reconhecido','warn');showHUD('?', 'Falha');setTimeout(clearPad,AUTO_CLEAR_DELAY);return;}
+  if(allowed&&!allowed.has(label)){setStatus(`${label} inválido`,'warn');showHUD(label,'Inválido');setTimeout(clearPad,AUTO_CLEAR_DELAY);return;}
+
+  showHUD(label,`Confiança ${pct}%`);
+  if(FLOW.step===1){FLOW.gender=label;FLOW.step=2;setStatus(`Gênero: ${label}. Agora 1–9.`,'ok');}
+  else if(FLOW.step===2){FLOW.length=Number(label);FLOW.step=3;setStatus(`Tamanho ${label}. Agora 3 letras.`,'ok');}
+  else if(FLOW.step===3){
+    FLOW.letters.push(label.toLowerCase());
+    if(FLOW.letters.length>=3){
+      const [a,b,c]=FLOW.letters;
+      const result=runNameLogic(FLOW.gender,FLOW.length,a,b,c);
+      resultEl.innerHTML=result.map(c=>{
+        const pct=c.prob.toFixed(1).replace('.',',');
+        const barWidth=Math.max(4,Math.min(100,c.prob));
+        return `<div class="result"><div class="result__row"><span class="result__name">${c.rawName}</span><span class="result__pct">${pct}%</span></div><div class="result__bar"><span class="result__fill" style="width:${barWidth}%"></span></div></div>`;
+      }).join('');
+      const top4=result.slice(0,4).map((c,i)=>`<span>${i+1}. ${c.rawName}</span>`).join('');
+      topNames.innerHTML=top4||'Minus';
+      setStatus('Feito!','ok');
+      FLOW.step=1;FLOW.gender=null;FLOW.length=null;FLOW.letters=[];
+      setTimeout(clearPad,AUTO_CLEAR_DELAY);
+    } else {
+      setStatus(`Letra ${FLOW.letters.length}/3: ${label}`,'ok');
+    }
+  }
+  updateStepUI();
+  setTimeout(clearPad,AUTO_CLEAR_DELAY);
+}
+updateStepUI();
+</script>
+</body>
+</html>
+
+
+
+
+
