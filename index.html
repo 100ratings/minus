@@ -63,7 +63,16 @@
   canvas{display:block; width:100%; height:100%; background:#000; touch-action:none;}
 
   /* HUD */
-  .hud{position:absolute; inset:0; display:grid; place-items:center; pointer-events:none}
+  .hud {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center; /* centraliza horizontalmente */
+  align-items: flex-start;  /* move para o topo */
+  pointer-events: none;
+  padding-top: 40px;        /* distância do topo — ajuste conforme quiser */
+  }
+  
   .hud .predChar{ font-size:min(22vw, 160px); color:rgba(255,255,255,.92); text-shadow:0 0 18px rgba(255,255,255,.18); line-height:1; }
   .hud .predInfo{ margin-top:8px; font-size:14px; color:#b8c3ce; text-shadow:0 1px 0 rgba(0,0,0,.5) }
 
@@ -215,4 +224,5 @@ updateStepUI();
 </script>
 </body>
 </html>
+
 
